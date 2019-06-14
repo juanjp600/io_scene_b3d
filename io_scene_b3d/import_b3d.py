@@ -311,17 +311,24 @@ def load_b3d(filepath,
     for i, mat in enumerate(data.materials if 'materials' in data else []):
         name = mat.name
         material = bpy.data.materials.new(name)
-        material.diffuse_color = mat.rgba[:-1]
-        material.alpha = mat.rgba[3]
-        material.use_transparency = material.alpha < 1
+
+        #material.diffuse_color = mat.rgba[:-1] # was mat.rgba[:-1], 2.80 says sequences of dimension 0 should contain 4 items, not 3
+        #material.alpha = mat.rgba[3]
+        material.diffuse_color = mat.rgba
+        #material.use_transparency = material.alpha < 1 # 2.80 says no attribute material.alpha
+        
+        # texture_slots.add doesn't work in 
+        '''
         texture = bpy.data.textures.new(name=name, type='IMAGE')
         tid = mat.tids[0]
         if tid in images:
             texture.image = images[tid]
-            mtex = material.texture_slots.add()
+            mtex = material.texture_slots.add() #2.80, says 'Material' object has no attribute texture_slots
             mtex.texture = texture
             mtex.texture_coords = 'UV'
             mtex.use_map_color_diffuse = True
+        '''
+
         materials[i] = material
 
     global armatures, bonesdata, weighting, bones_ids, bones_node

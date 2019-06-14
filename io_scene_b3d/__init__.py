@@ -21,7 +21,7 @@
 bl_info = {
     "name": "Blitz 3D format",
     "author": "Joric",
-    "blender": (2, 74, 0),
+    "blender": (2, 80, 0),
     "location": "File > Import-Export",
     "description": "Import-Export B3D, meshes, uvs, materials, textures, "
                    "cameras & lamps",
@@ -49,15 +49,13 @@ from bpy.props import (
 from bpy_extras.io_utils import (
         ImportHelper,
         ExportHelper,
-        orientation_helper_factory,
+        orientation_helper,
         axis_conversion,
         )
 
 
-IOB3DOrientationHelper = orientation_helper_factory("IOB3DOrientationHelper", axis_forward='Y', axis_up='Z')
-
-
-class ImportB3D(bpy.types.Operator, ImportHelper, IOB3DOrientationHelper):
+@orientation_helper(axis_forward='Y', axis_up='Z')
+class ImportB3D(bpy.types.Operator, ImportHelper):
     """Import from B3D file format (.b3d)"""
     bl_idname = "import_scene.blitz3d_b3d"
     bl_label = 'Import B3D'
@@ -103,7 +101,7 @@ class ImportB3D(bpy.types.Operator, ImportHelper, IOB3DOrientationHelper):
         return import_b3d.load(self, context, **keywords)
 
 
-class ExportB3D(bpy.types.Operator, ExportHelper, IOB3DOrientationHelper):
+class ExportB3D(bpy.types.Operator, ExportHelper):
     """Export to B3D file format (.b3d)"""
     bl_idname = "export_scene.blitz3d_b3d"
     bl_label = 'Export B3D'
@@ -178,11 +176,17 @@ class DebugMacro(bpy.types.Operator):
 
 addon_keymaps = []
 
-def register():
-    bpy.utils.register_module(__name__)
+classes = (
+    ImportB3D,
+    ExportB3D
+)
 
-    bpy.types.INFO_MT_file_import.append(menu_func_import)
-    bpy.types.INFO_MT_file_export.append(menu_func_export)
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+
+    bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
+    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
     # handle the keymap
     wm = bpy.context.window_manager
@@ -192,10 +196,11 @@ def register():
     addon_keymaps.append((km, kmi))
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
+    for cls in classes:
+        bpy.utils.unregister_class(cls)
 
-    bpy.types.INFO_MT_file_import.remove(menu_func_import)
-    bpy.types.INFO_MT_file_export.remove(menu_func_export)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 
     # handle the keymap
     for km, kmi in addon_keymaps:
