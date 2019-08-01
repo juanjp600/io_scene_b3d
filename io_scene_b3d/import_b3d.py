@@ -11,6 +11,7 @@ try:
     import bpy
     import mathutils
     from bpy_extras.image_utils import load_image
+    from bpy_extras import node_shader_utils
     from bpy_extras.io_utils import unpack_list, unpack_face_list
     import bmesh
 except:
@@ -33,15 +34,15 @@ def make_skeleton(node):
     objName = 'armature'
     a = bpy.data.objects.new(objName, bpy.data.armatures.new(objName))
 
-    armatures.append(a);
-    ctx.scene.objects.link(a)
+    armatures.append(a)
+    ctx.scene.collection.objects.link(a)
 
-    for i in bpy.context.selected_objects: i.select = False #deselect all objects
+    for i in bpy.context.selected_objects: i.select_set(False) #deselect all objects
 
-    a.select = True
-    a.show_x_ray = True
-    a.data.draw_type = 'STICK'
-    bpy.context.scene.objects.active = a
+    a.select_set(True)
+    #a.show_x_ray = True
+    #a.data.draw_type = 'STICK'
+    bpy.context.view_layer.objects.active = a
 
     bpy.ops.object.mode_set(mode='EDIT',toggle=False)
 
@@ -72,7 +73,7 @@ def make_skeleton(node):
 
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    for i in bpy.context.selected_objects: i.select = False #deselect all objects
+    for i in bpy.context.selected_objects: i.select_set(False) #deselect all objects
 
     # get parent mesh (hardcoded so far)
     objName = 'anim'
@@ -162,7 +163,7 @@ def make_skeleton(node):
 
 
 def assign_material_slots(ob, node, mat_slots):
-    bpy.context.scene.objects.active = ob
+    bpy.context.view_layer.objects.active = ob
     bpy.ops.object.mode_set(mode='EDIT')
     me = ob.data
     bm = bmesh.from_edit_mesh(me)
@@ -178,7 +179,7 @@ def assign_material_slots(ob, node, mat_slots):
 
 def postprocess(ob, mesh, node):
     ops = bpy.ops
-    bpy.context.scene.objects.active = ob
+    bpy.context.view_layer.objects.active = ob
     ops.object.mode_set(mode='EDIT')
     ops.mesh.select_all(action='SELECT')
 
@@ -215,7 +216,7 @@ def import_mesh(node):
     # assign uv coordinates
     vert_uvs = [(0,0) if len(uv)==0 else (uv[0], 1-uv[1]) for uv in node.uvs]
     me = ob.data
-    me.uv_textures.new()
+    me.uv_layers.new(do_init=False)
     me.uv_layers[-1].data.foreach_set("uv", [uv for pair in [vert_uvs[l.vertex_index] for l in me.loops] for uv in pair])
 
     # assign materials and textures
@@ -225,12 +226,12 @@ def import_mesh(node):
             mat = materials[face.brush_id]
             ob.data.materials.append(mat)
             mat_slots[face.brush_id] = len(ob.data.materials)-1
-            for uv_face in ob.data.uv_textures.active.data:
-                if mat.active_texture:
-                    uv_face.image = mat.active_texture.image
+            #for uv_face in ob.data.uv_layers.active.data:
+            #    if mat.active_texture:
+            #        uv_face.image = mat.active_texture.image
 
     # link object to scene
-    ctx.scene.objects.link(ob)
+    ctx.scene.collection.objects.link(ob)
 
     if len(node.faces)>1:
         assign_material_slots(ob, node, mat_slots)
@@ -246,7 +247,7 @@ def import_node(node, parent):
         ob = import_mesh(node)
     else:
         ob = bpy.data.objects.new(node.name, None)
-        ctx.scene.objects.link(ob)
+        ctx.scene.collection.objects.link(ob)
 
     ob.rotation_mode='QUATERNION'
     ob.rotation_quaternion = flip(node.rotation)
@@ -311,17 +312,14 @@ def load_b3d(filepath,
     for i, mat in enumerate(data.materials if 'materials' in data else []):
         name = mat.name
         material = bpy.data.materials.new(name)
-        material.diffuse_color = mat.rgba[:-1]
-        material.alpha = mat.rgba[3]
-        material.use_transparency = material.alpha < 1
-        texture = bpy.data.textures.new(name=name, type='IMAGE')
+        material_wrap = node_shader_utils.PrincipledBSDFWrapper(material, is_readonly=False)
+        # material.diffuse_color = mat.rgba[:]
+        material_wrap.base_color = mat.rgba[:-1]
+        # texture = bpy.data.textures.new(name=name, type='IMAGE')
         tid = mat.tids[0]
         if tid in images:
-            texture.image = images[tid]
-            mtex = material.texture_slots.add()
-            mtex.texture = texture
-            mtex.texture_coords = 'UV'
-            mtex.use_map_color_diffuse = True
+            material_wrap.base_color_texture.image = images[tid]
+            material_wrap.base_color_texture.texcoords = 'UV'
         materials[i] = material
 
     global armatures, bonesdata, weighting, bones_ids, bones_node
